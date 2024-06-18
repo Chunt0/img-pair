@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Viewer</title>
+</head>
+<body>
+    <div id="imageContainer">
+        <img id="current-image1" src="" height="800" alt="Image">
+        <img id="current-image2" src="" height="800" alt="Image">
+    </div>
+
+    <div id="inputContainer">
+        <input type="text" id="image-caption" size="75" style="font-size: 18px;">
+    </div>
+
+    <button id="next-button">Next Image</button>
+
+    <script>
+        let imagePaths = {{ image_files | tojson | safe }};
+        const currentImage1 = document.getElementById("current-image1");
+        const currentImage2 = document.getElementById("current-image2");
+        const userCaption = document.getElementById("image-caption");
+        const nextButton = document.getElementById("next-button");
+        let currentIndex = 0;
+
+        function loadCurrentImage() {
+            currentImage1.src = `${imagePaths[currentIndex][0]}`;
+            currentImage2.src = `${imagePaths[currentIndex][1]}`;
+            userCaption.value = "";
+            userCaption.focus();
+        }
+
+        function nextImage() {
+            const metadata = {
+                srcPathImg1: `${imagePaths[currentIndex][0]}`,
+                dstPathImg1: `./static/completed/${imagePaths[currentIndex][2]}_${imagePaths[currentIndex][0].split('/').pop().split(".")[0]}.png`,
+                srcPathImg2: `${imagePaths[currentIndex][1]}`,
+                dstPathImg2: `./static/completed/${imagePaths[currentIndex][2]}_${imagePaths[currentIndex][1].split('/').pop().split(".")[0]}.png`,
+                caption: userCaption.value,
+            };
+
+            fetch('/move_image', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(metadata)
+            }).then(response => {
+                if (response.ok) {
+                    console.log("Image and Caption moved to completed");
+                    currentIndex = (currentIndex + 1) % imagePaths.length;
+                    if (currentIndex === 0) {
+                        fetch('/reshuffle_images', {
+                            method: 'GET',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            }
+                        }).then(response => response.json())
+                          .then(data => {
+                              imagePaths = data.newImagePaths;
+                              console.log("Images reshuffled");
+                              loadCurrentImage();
+                          }).catch(error => {
+                              console.error('Error:', error);
+                          });
+                    } else {
+                        loadCurrentImage();
+                    }
+                } else {
+                    console.error("Failed to move Image and Caption");
+                }
+            }).catch(error => {
+                console.error('Error:', error);
+            });
+        }
+
+        nextButton.addEventListener("click", nextImage);
+        userCaption.addEventListener("keyup", function(event) {
+            if (event.key === "Enter") {
+                nextButton.click();
+            }
+        });
+
+        loadCurrentImage();
+    </script>
+</body>
+</html>
